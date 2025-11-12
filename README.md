@@ -42,7 +42,7 @@ mise run install
 mise run test
 
 # Convert a PDF to ICS
-mise run convert Billet.pdf DSB_Rejse_2025-11-14.ics
+mise run convert -- Billet.pdf DSB_Rejse_2025-11-14.ics
 
 # Run example conversion
 mise run example
@@ -149,7 +149,7 @@ The project includes the following convenient tasks:
 |------|-------------|
 | `mise run install` | Install Python dependencies |
 | `mise run test` | Run automated tests |
-| `mise run convert <input.pdf> [output.ics]` | Convert a DSB ticket PDF to ICS |
+| `mise run convert -- <input.pdf> [output.ics]` | Convert a DSB ticket PDF to ICS (note the `--`) |
 | `mise run example` | Run example conversion with Billet.pdf |
 | `mise run clean` | Clean up generated files and cache |
 
@@ -179,11 +179,22 @@ Currently tested with:
 - InterCity trains
 - Regional trains
 
+## Supported Stations
+
+The tool recognizes Danish stations with common suffixes:
+- **H** - Hovedbanegård (e.g., København H, Aarhus H)
+- **St.** - Station (e.g., Skanderborg St., Fredericia St.)
+- **M** - Other stations (e.g., Odense M)
+
+Tested with routes including:
+- Aarhus H ↔ København H
+- København H ↔ Skanderborg St.
+
 ## Limitations
 
 - Requires valid DSB ticket PDFs with standard format
-- Currently optimized for Danish station names ending in "H" (Hovedbanegård)
 - Year is inferred from booking date or current date if month has passed
+- Best results with standard DSB Print Selv-billet format
 
 ## Contributing
 

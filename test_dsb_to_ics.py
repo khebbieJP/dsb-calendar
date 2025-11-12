@@ -145,6 +145,49 @@ class TestDSBToICS:
             if Path(output_path).exists():
                 os.unlink(output_path)
 
+    def test_station_with_st_suffix(self):
+        """Test extraction of stations ending in St. (like Skanderborg St.)"""
+        # Check if Billet2.pdf exists
+        billet2_path = "Billet2.pdf"
+        if not Path(billet2_path).exists():
+            pytest.skip("Billet2.pdf not found, skipping St. suffix test")
+
+        # Extract info from Billet2.pdf
+        info = extract_ticket_info(billet2_path)
+
+        # Verify stations are correctly extracted
+        assert 'from_station' in info, "Missing from_station"
+        assert 'to_station' in info, "Missing to_station"
+
+        # Should be København H → Skanderborg St.
+        assert info['from_station'] == 'København H', \
+            f"Expected 'København H', got '{info['from_station']}'"
+        assert 'Skanderborg' in info['to_station'], \
+            f"Expected station with 'Skanderborg', got '{info['to_station']}'"
+
+        # Create ICS and verify
+        with tempfile.NamedTemporaryFile(mode='wb', suffix='.ics', delete=False) as f:
+            temp_ics_path = f.name
+
+        try:
+            create_ics_file(info, temp_ics_path)
+
+            # Parse and verify
+            with open(temp_ics_path, 'rb') as f:
+                cal = Calendar.from_ical(f.read())
+
+            events = [component for component in cal.walk() if component.name == 'VEVENT']
+            assert len(events) == 1
+
+            event = events[0]
+            summary = event.get('summary')
+            assert 'Skanderborg' in summary, \
+                f"Expected 'Skanderborg' in summary, got '{summary}'"
+
+        finally:
+            if Path(temp_ics_path).exists():
+                os.unlink(temp_ics_path)
+
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

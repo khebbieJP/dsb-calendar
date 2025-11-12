@@ -66,8 +66,8 @@ def extract_ticket_info(pdf_path):
         info['departure_time'] = (int(hour), int(minute))
 
     # Extract stations - looking for common Danish station names
-    # Pattern to find the journey line with stations
-    station_pattern = r'(\d{1,2})\.(jan|feb|mar|apr|maj|jun|jul|aug|sep|okt|nov|dec)\.\s+(\d{1,2}):(\d{2})\s+([\w\s]+?H)\s+([\w\s]+?H)\s+\d{1,2}\.(jan|feb|mar|apr|maj|jun|jul|aug|sep|okt|nov|dec)\.\s+(\d{1,2}):(\d{2})'
+    # Pattern to find the journey line with stations (supports H, St., M, and other suffixes)
+    station_pattern = r'(\d{1,2})\.(jan|feb|mar|apr|maj|jun|jul|aug|sep|okt|nov|dec)\.\s+(\d{1,2}):(\d{2})\s+([\w\s]+?(?:H|St\.|M))\s+([\w\s]+?(?:H|St\.|M))\s+\d{1,2}\.(jan|feb|mar|apr|maj|jun|jul|aug|sep|okt|nov|dec)\.\s+(\d{1,2}):(\d{2})'
     station_match = re.search(station_pattern, full_text, re.IGNORECASE)
 
     if station_match:
@@ -76,8 +76,9 @@ def extract_ticket_info(pdf_path):
         info['arrival_time'] = (int(station_match.group(8)), int(station_match.group(9)))
     else:
         # Fallback: look for explicit station names in "Fra: X" and "Til: Y" format
-        from_pattern = r'Fra:\s+([\w\s]+H)'
-        to_pattern = r'Til:\s+([\w\s]+H)'
+        # Match stations ending in H, St., M or other common patterns
+        from_pattern = r'Fra:\s+([\w\s]+?(?:H|St\.|M))(?:\s|$)'
+        to_pattern = r'Til:\s+([\w\s]+?(?:H|St\.|M))(?:\s|$|,)'
         from_match = re.search(from_pattern, full_text, re.IGNORECASE)
         to_match = re.search(to_pattern, full_text, re.IGNORECASE)
 
@@ -85,12 +86,13 @@ def extract_ticket_info(pdf_path):
             info['from_station'] = from_match.group(1).strip()
             info['to_station'] = to_match.group(1).strip()
         else:
-            # Last fallback: common station names
-            station_names = r'(Aarhus H|København H|Aalborg|Odense M|Fredericia St)'
-            stations = re.findall(station_names, full_text)
-            if len(stations) >= 2:
-                info['from_station'] = stations[0]
-                info['to_station'] = stations[1]
+            # Last fallback: look for station names in travel plan section
+            # This handles the format "København H - Skanderborg St."
+            route_pattern = r'([\w\s]+?(?:H|St\.|M))\s*-\s*([\w\s]+?(?:H|St\.|M))'
+            route_match = re.search(route_pattern, full_text, re.IGNORECASE)
+            if route_match:
+                info['from_station'] = route_match.group(1).strip()
+                info['to_station'] = route_match.group(2).strip()
 
     # Extract arrival time if not found
     if 'arrival_time' not in info:

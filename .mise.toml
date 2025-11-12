@@ -13,15 +13,9 @@ description = "Run automated tests"
 run = "pytest test_dsb_to_ics.py -v"
 
 [tasks.convert]
-description = "Convert DSB PDF ticket to ICS calendar file"
-run = """
-if [ -z "$1" ]; then
-  echo "Usage: mise run convert <input.pdf> [output.ics]"
-  echo "Example: mise run convert Billet.pdf DSB_Rejse.ics"
-  exit 1
-fi
-python dsb_to_ics.py "$@"
-"""
+description = "Convert DSB PDF ticket to ICS calendar file (usage: mise run convert -- <input.pdf> [output.ics])"
+run = "python dsb_to_ics.py $@"
+
 
 [tasks.example]
 description = "Run example conversion with Billet.pdf"
