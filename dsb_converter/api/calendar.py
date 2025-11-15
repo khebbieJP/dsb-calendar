@@ -9,6 +9,12 @@ from icalendar import Calendar, Event
 from dateutil import tz
 
 from .models import TicketInfo
+from .constants import (
+    CALENDAR_PRODUCT_ID,
+    CALENDAR_VERSION,
+    CALENDAR_EVENT_CATEGORY,
+    COPENHAGEN_TIMEZONE
+)
 
 
 class CalendarGenerationError(Exception):
@@ -37,14 +43,14 @@ def create_ics_bytes(info: TicketInfo) -> bytes:
 
     # Create calendar
     cal = Calendar()
-    cal.add('prodid', '-//DSB Transport//example.com//')
-    cal.add('version', '2.0')
+    cal.add('prodid', CALENDAR_PRODUCT_ID)
+    cal.add('version', CALENDAR_VERSION)
 
     # Create event
     event = Event()
 
     # Set start and end times (convert to UTC)
-    copenhagen_tz = tz.gettz('Europe/Copenhagen')
+    copenhagen_tz = tz.gettz(COPENHAGEN_TIMEZONE)
 
     day, month, year = info.departure_date
     dep_hour, dep_minute = info.departure_time
@@ -88,7 +94,7 @@ def create_ics_bytes(info: TicketInfo) -> bytes:
         description_parts.append(f'pris {info.price} kr.')
 
     event.add('description', ', '.join(description_parts))
-    event.add('categories', 'Travel')
+    event.add('categories', CALENDAR_EVENT_CATEGORY)
 
     # Add event to calendar
     cal.add_component(event)

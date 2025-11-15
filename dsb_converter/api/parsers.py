@@ -10,6 +10,7 @@ import pdfplumber
 
 from .models import TicketInfo
 from .utils import parse_danish_month
+from .constants import TRAIN_TYPES, TRAVEL_CLASS_FIRST, TRAVEL_CLASS_SECOND
 
 
 class TicketParsingError(Exception):
@@ -116,7 +117,8 @@ def extract_ticket_info(pdf_path: Union[str, Path]) -> TicketInfo:
             info.arrival_time = (int(times[1][0]), int(times[1][1]))
 
     # Extract train information
-    train_pattern = r'(InterCityLyn|InterCity|Regionaltog|Lyn)\s+(\d+)'
+    train_types_pattern = '|'.join(TRAIN_TYPES)
+    train_pattern = rf'({train_types_pattern})\s+(\d+)'
     train_match = re.search(train_pattern, full_text, re.IGNORECASE)
     if train_match:
         info.train_type = train_match.group(1)
@@ -150,9 +152,9 @@ def extract_ticket_info(pdf_path: Union[str, Path]) -> TicketInfo:
     if class_match:
         class_text = class_match.group(1)
         if '1' in class_text:
-            info.travel_class = '1. klasse'
+            info.travel_class = TRAVEL_CLASS_FIRST
         else:
-            info.travel_class = '2. klasse'
+            info.travel_class = TRAVEL_CLASS_SECOND
 
     # Extract price
     price_pattern = r'(\d+)\s*kr\.'
