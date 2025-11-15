@@ -42,3 +42,4 @@ htmlcov/
 
 # Mise
 .mise.lock
+.beads/
