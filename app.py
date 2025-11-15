@@ -6,6 +6,7 @@ Flask web application for DSB ticket PDF to ICS conversion
 import os
 import tempfile
 from pathlib import Path
+from io import BytesIO
 from flask import Flask, request, jsonify, send_file, render_template
 from werkzeug.utils import secure_filename
 
@@ -16,7 +17,11 @@ from dsb_converter.api.calendar import CalendarGenerationError
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
+
+# Create dedicated temp directory for uploads
+UPLOAD_TEMP_DIR = Path(tempfile.gettempdir()) / 'dsb_converter_uploads'
+UPLOAD_TEMP_DIR.mkdir(exist_ok=True)
+app.config['UPLOAD_FOLDER'] = str(UPLOAD_TEMP_DIR)
 
 ALLOWED_EXTENSIONS = {'pdf'}
 
@@ -76,59 +81,53 @@ def convert_pdf():
     # Get response format preference
     response_format = request.form.get('format', 'ics').lower()
 
+    # Create unique temporary file for uploaded PDF
+    temp_pdf = None
     try:
-        # Save uploaded file temporarily
-        filename = secure_filename(file.filename)
-        temp_pdf = Path(app.config['UPLOAD_FOLDER']) / filename
-        file.save(temp_pdf)
+        # Save uploaded file temporarily with unique name
+        with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf',
+                                        dir=app.config['UPLOAD_FOLDER'],
+                                        delete=False) as f:
+            temp_pdf = Path(f.name)
+            file.save(temp_pdf)
 
-        try:
-            # Extract ticket information
-            info = extract_ticket_info(temp_pdf)
+        # Extract ticket information
+        info = extract_ticket_info(temp_pdf)
 
-            if not info.is_valid():
-                return jsonify({
-                    'error': 'Incomplete ticket information',
-                    'message': 'Could not extract all required information from the PDF',
-                    'extracted_data': info.to_dict()
-                }), 422
+        if not info.is_valid():
+            return jsonify({
+                'error': 'Incomplete ticket information',
+                'message': 'Could not extract all required information from the PDF',
+                'extracted_data': info.to_dict()
+            }), 422
 
-            # Return JSON response if requested
-            if response_format == 'json':
-                return jsonify({
-                    'success': True,
-                    'data': info.to_dict(),
-                    'formatted': {
-                        'from': info.from_station,
-                        'to': info.to_station,
-                        'departure': info.get_formatted_departure(),
-                        'arrival': info.get_formatted_arrival(),
-                        'train': f"{info.train_type} {info.train_number}" if info.train_type and info.train_number else None,
-                    }
-                })
+        # Return JSON response if requested
+        if response_format == 'json':
+            return jsonify({
+                'success': True,
+                'data': info.to_dict(),
+                'formatted': {
+                    'from': info.from_station,
+                    'to': info.to_station,
+                    'departure': info.get_formatted_departure(),
+                    'arrival': info.get_formatted_arrival(),
+                    'train': f"{info.train_type} {info.train_number}" if info.train_type and info.train_number else None,
+                }
+            })
 
-            # Generate ICS file
-            ics_data = create_ics_bytes(info)
+        # Generate ICS file
+        ics_data = create_ics_bytes(info)
 
-            # Create response with ICS file
-            output_filename = f"DSB_Rejse_{info.get_formatted_departure().replace(' ', '_').replace(':', '-')}.ics" \
-                if info.get_formatted_departure() else 'DSB_Rejse.ics'
+        # Create response with ICS file using BytesIO (no temp file needed)
+        output_filename = f"DSB_Rejse_{info.get_formatted_departure().replace(' ', '_').replace(':', '-')}.ics" \
+            if info.get_formatted_departure() else 'DSB_Rejse.ics'
 
-            # Write ICS to temporary file for sending
-            temp_ics = Path(app.config['UPLOAD_FOLDER']) / output_filename
-            temp_ics.write_bytes(ics_data)
-
-            return send_file(
-                temp_ics,
-                as_attachment=True,
-                download_name=output_filename,
-                mimetype='text/calendar'
-            )
-
-        finally:
-            # Clean up temporary PDF
-            if temp_pdf.exists():
-                temp_pdf.unlink()
+        return send_file(
+            BytesIO(ics_data),
+            as_attachment=True,
+            download_name=output_filename,
+            mimetype='text/calendar'
+        )
 
     except FileNotFoundError as e:
         return jsonify({
@@ -154,6 +153,14 @@ def convert_pdf():
             'error': 'Internal server error',
             'message': 'An unexpected error occurred. Please try again.'
         }), 500
+
+    finally:
+        # Clean up temporary PDF
+        if temp_pdf and temp_pdf.exists():
+            try:
+                temp_pdf.unlink()
+            except Exception as e:
+                app.logger.warning(f"Failed to clean up temp file {temp_pdf}: {e}")
 
 
 @app.errorhandler(413)
