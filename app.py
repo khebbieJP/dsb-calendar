@@ -5,25 +5,35 @@ Flask web application for DSB ticket PDF to ICS conversion
 
 import os
 import tempfile
+import uuid
 from pathlib import Path
 from io import BytesIO
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, render_template, g
 from werkzeug.utils import secure_filename
 
 from dsb_converter.api import extract_ticket_info, create_ics_bytes
 from dsb_converter.api.parsers import TicketParsingError
 from dsb_converter.api.calendar import CalendarGenerationError
+from dsb_converter.api.constants import MAX_FILE_SIZE_BYTES, ALLOWED_EXTENSIONS
+from dsb_converter.logging_config import setup_structured_logging
 
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE_BYTES
+
+# Configure structured logging
+logger = setup_structured_logging('dsb_converter_app')
 
 # Create dedicated temp directory for uploads
 UPLOAD_TEMP_DIR = Path(tempfile.gettempdir()) / 'dsb_converter_uploads'
 UPLOAD_TEMP_DIR.mkdir(exist_ok=True)
 app.config['UPLOAD_FOLDER'] = str(UPLOAD_TEMP_DIR)
 
-ALLOWED_EXTENSIONS = {'pdf'}
+
+@app.before_request
+def before_request():
+    """Generate request ID for tracking"""
+    g.request_id = str(uuid.uuid4())
 
 
 def allowed_file(filename):
@@ -148,7 +158,12 @@ def convert_pdf():
         }), 500
 
     except Exception as e:
-        app.logger.error(f"Unexpected error: {e}", exc_info=True)
+        logger.error(
+            f"Unexpected error: {e}",
+            exc_info=True,
+            request_id=g.request_id,
+            operation='convert_pdf'
+        )
         return jsonify({
             'error': 'Internal server error',
             'message': 'An unexpected error occurred. Please try again.'
@@ -160,7 +175,12 @@ def convert_pdf():
             try:
                 temp_pdf.unlink()
             except Exception as e:
-                app.logger.warning(f"Failed to clean up temp file {temp_pdf}: {e}")
+                logger.warning(
+                    f"Failed to clean up temp file {temp_pdf}: {e}",
+                    request_id=g.request_id,
+                    operation='cleanup_temp_file',
+                    file_path=str(temp_pdf)
+                )
 
 
 @app.errorhandler(413)
@@ -184,7 +204,12 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     """Handle 500 errors"""
-    app.logger.error(f"Internal error: {error}", exc_info=True)
+    logger.error(
+        f"Internal error: {error}",
+        exc_info=True,
+        request_id=g.get('request_id', 'unknown'),
+        operation='error_handler_500'
+    )
     return jsonify({
         'error': 'Internal server error',
         'message': 'An unexpected error occurred'
