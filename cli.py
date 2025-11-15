@@ -4,6 +4,7 @@ CLI tool for converting DSB ticket PDFs to ICS calendar files
 """
 
 import sys
+import logging
 from pathlib import Path
 
 from dsb_converter.api import extract_ticket_info, create_ics_file
@@ -11,16 +12,40 @@ from dsb_converter.api.parsers import TicketParsingError
 from dsb_converter.api.calendar import CalendarGenerationError
 
 
-def print_usage():
+def setup_cli_logging():
+    """Configure logging for CLI use with human-readable output"""
+    logger = logging.getLogger('dsb_cli')
+    logger.setLevel(logging.INFO)
+
+    # Remove existing handlers
+    logger.handlers.clear()
+
+    # Create console handler with simple format for CLI
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.INFO)
+
+    # Use simple formatter for human-readable CLI output
+    formatter = logging.Formatter('%(message)s')
+    handler.setFormatter(formatter)
+
+    logger.addHandler(handler)
+    logger.propagate = False
+
+    return logger
+
+
+def print_usage(logger):
     """Print usage information"""
-    print("Usage: python cli.py <input_pdf> [output_ics]")
-    print("Example: python cli.py Billet.pdf DSB_Rejse_2025-11-14.ics")
+    logger.info("Usage: python cli.py <input_pdf> [output_ics]")
+    logger.info("Example: python cli.py Billet.pdf DSB_Rejse_2025-11-14.ics")
 
 
 def main():
     """Main CLI function"""
+    logger = setup_cli_logging()
+
     if len(sys.argv) < 2:
-        print_usage()
+        print_usage(logger)
         sys.exit(1)
 
     input_pdf = sys.argv[1]
@@ -34,71 +59,67 @@ def main():
 
     # Check if input file exists
     if not Path(input_pdf).exists():
-        print(f"Error: File '{input_pdf}' not found.")
+        logger.error(f"Error: File '{input_pdf}' not found.")
         sys.exit(1)
 
-    print(f"Processing: {input_pdf}")
+    logger.info(f"Processing: {input_pdf}")
 
     # Extract information from PDF
     try:
         info = extract_ticket_info(input_pdf)
 
         # Display extracted information
-        print("\nExtracted Information:")
-        print(f"  From: {info.from_station or 'N/A'}")
-        print(f"  To: {info.to_station or 'N/A'}")
+        logger.info("\nExtracted Information:")
+        logger.info(f"  From: {info.from_station or 'N/A'}")
+        logger.info(f"  To: {info.to_station or 'N/A'}")
 
         if info.departure_date:
-            print(f"  Departure: {info.get_formatted_departure()}")
+            logger.info(f"  Departure: {info.get_formatted_departure()}")
 
         if info.arrival_time:
-            print(f"  Arrival: {info.get_formatted_arrival()}")
+            logger.info(f"  Arrival: {info.get_formatted_arrival()}")
 
         if info.train_type and info.train_number:
-            print(f"  Train: {info.train_type} {info.train_number}")
+            logger.info(f"  Train: {info.train_type} {info.train_number}")
 
         if info.wagon:
-            print(f"  Wagon: {info.wagon}")
+            logger.info(f"  Wagon: {info.wagon}")
 
         if info.seat:
-            print(f"  Seat: {info.seat}")
+            logger.info(f"  Seat: {info.seat}")
 
         if info.travel_class:
-            print(f"  Class: {info.travel_class}")
+            logger.info(f"  Class: {info.travel_class}")
 
         if info.price:
-            print(f"  Price: {info.price} kr.")
+            logger.info(f"  Price: {info.price} kr.")
 
         # Validate extracted information
         if not info.is_valid():
-            print("\nWarning: Some required information is missing.")
-            print("The ICS file may not be complete.")
+            logger.warning("\nWarning: Some required information is missing.")
+            logger.warning("The ICS file may not be complete.")
 
         # Create ICS file
-        print(f"\nCreating ICS file...")
+        logger.info(f"\nCreating ICS file...")
         create_ics_file(info, output_ics)
 
-        print(f"ICS file created: {output_ics}")
-        print("\nDone!")
+        logger.info(f"ICS file created: {output_ics}")
+        logger.info("\nDone!")
 
     except FileNotFoundError as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         sys.exit(1)
 
     except TicketParsingError as e:
-        print(f"Error parsing PDF: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error parsing PDF: {e}", exc_info=True)
         sys.exit(1)
 
     except CalendarGenerationError as e:
-        print(f"Error creating calendar: {e}")
+        logger.error(f"Error creating calendar: {e}")
         sys.exit(1)
 
     except Exception as e:
-        print(f"Unexpected error: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Unexpected error: {e}", exc_info=True)
         sys.exit(1)
 
 
