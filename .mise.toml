@@ -10,16 +10,29 @@ run = "uv pip install -r requirements.txt"
 
 [tasks.test]
 description = "Run automated tests"
-run = "pytest test_dsb_to_ics.py -v"
+depends = ["install"]
+run = "pytest test_*.py -v"
 
 [tasks.convert]
 description = "Convert DSB PDF ticket to ICS calendar file (usage: mise run convert -- <input.pdf> [output.ics])"
-run = "python dsb_to_ics.py $@"
-
+depends = ["install"]
+run = "python cli.py $@"
 
 [tasks.example]
 description = "Run example conversion with Billet.pdf"
-run = "python dsb_to_ics.py Billet.pdf DSB_Rejse_Example.ics"
+depends = ["install"]
+run = "python cli.py Billet.pdf DSB_Rejse_Example.ics"
+
+[tasks.web]
+description = "Start Flask web application"
+depends = ["install"]
+run = "python app.py"
+
+[tasks.dev]
+description = "Start Flask web application in debug mode"
+depends = ["install"]
+env = { FLASK_DEBUG = "true" }
+run = "python app.py"
 
 [tasks.clean]
 description = "Clean up generated files and cache"

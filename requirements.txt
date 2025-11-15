@@ -1,4 +1,14 @@
+# Core dependencies
 pdfplumber==0.11.0
 icalendar==5.0.11
 python-dateutil==2.8.2
+
+# Flask web framework
+flask==3.0.0
+werkzeug==3.0.1
+
+# For API requests (used in health checks)
+requests==2.31.0
+
+# Testing
 pytest==8.0.0

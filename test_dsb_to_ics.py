@@ -9,7 +9,8 @@ from pathlib import Path
 from datetime import datetime
 import pytest
 from icalendar import Calendar
-from dsb_to_ics import extract_ticket_info, create_ics_file
+from dsb_converter.api import extract_ticket_info, create_ics_file
+from dsb_converter.api.models import TicketInfo
 
 
 class TestDSBToICS:
@@ -45,11 +46,21 @@ class TestDSBToICS:
         """Test that ticket information is correctly extracted from PDF"""
         info = extract_ticket_info(test_pdf_path)
 
+        # Verify info is a TicketInfo object
+        assert isinstance(info, TicketInfo), f"Expected TicketInfo, got {type(info)}"
+
         # Verify all expected fields are present and correct
-        for key, expected_value in expected_data.items():
-            assert key in info, f"Missing field: {key}"
-            assert info[key] == expected_value, \
-                f"Field {key}: expected {expected_value}, got {info[key]}"
+        assert info.from_station == expected_data['from_station']
+        assert info.to_station == expected_data['to_station']
+        assert info.departure_date == expected_data['departure_date']
+        assert info.departure_time == expected_data['departure_time']
+        assert info.arrival_time == expected_data['arrival_time']
+        assert info.train_type == expected_data['train_type']
+        assert info.train_number == expected_data['train_number']
+        assert info.wagon == expected_data['wagon']
+        assert info.seat == expected_data['seat']
+        assert info.travel_class == expected_data['class']
+        assert info.price == expected_data['price']
 
     def test_create_ics_file(self, test_pdf_path, expected_data):
         """Test that ICS file is correctly created"""
@@ -156,14 +167,14 @@ class TestDSBToICS:
         info = extract_ticket_info(billet2_path)
 
         # Verify stations are correctly extracted
-        assert 'from_station' in info, "Missing from_station"
-        assert 'to_station' in info, "Missing to_station"
+        assert info.from_station is not None, "Missing from_station"
+        assert info.to_station is not None, "Missing to_station"
 
         # Should be København H → Skanderborg St.
-        assert info['from_station'] == 'København H', \
-            f"Expected 'København H', got '{info['from_station']}'"
-        assert 'Skanderborg' in info['to_station'], \
-            f"Expected station with 'Skanderborg', got '{info['to_station']}'"
+        assert info.from_station == 'København H', \
+            f"Expected 'København H', got '{info.from_station}'"
+        assert 'Skanderborg' in info.to_station, \
+            f"Expected station with 'Skanderborg', got '{info.to_station}'"
 
         # Create ICS and verify
         with tempfile.NamedTemporaryFile(mode='wb', suffix='.ics', delete=False) as f:

@@ -1,18 +1,42 @@
-# DSB Ticket PDF to ICS Calendar Converter
+# DSB Ticket PDF to ICS Converter
 
-A Python tool that extracts train journey information from Danish State Railways (DSB) ticket PDFs and generates ICS calendar files for easy import into calendar applications.
+A Python application for converting Danish State Railways (DSB) ticket PDFs into ICS calendar files. Features a clean API, Flask web application, and command-line interface.
 
 ## Features
 
-- Extracts journey details from DSB Print Selv-billet PDFs
-- Generates standard ICS (iCalendar) files compatible with all major calendar applications
-- Correctly handles Danish date/time formats and station names
-- Includes comprehensive journey details (train number, wagon, seat, class, price)
-- Automatic timezone conversion (Copenhagen time to UTC)
+- **Clean API Architecture**: Modular design with parsers, calendar generation, and data models
+- **Flask Web Application**: User-friendly web interface with drag-and-drop file upload
+- **REST API**: JSON endpoints for programmatic access
+- **CLI Tool**: Command-line interface for batch processing
+- **Docker Support**: Easy deployment with Docker and docker-compose
+- **Comprehensive Testing**: Full test suite with pytest
+- **Error Handling**: Robust validation and error messages
+
+## Quick Start
+
+### Web Interface
+
+```bash
+mise run web
+# Open http://localhost:5000
+```
+
+### Command Line
+
+```bash
+mise run convert -- Billet.pdf output.ics
+```
+
+### Docker
+
+```bash
+docker-compose up --build
+# Open http://localhost:5000
+```
 
 ## Installation
 
-1. Ensure Python 3.11+ is installed and configured with mise:
+1. Ensure mise is installed and Python 3.11+ is configured:
 
 ```bash
 mise trust
@@ -22,188 +46,225 @@ mise install
 2. Install dependencies:
 
 ```bash
-mise exec -- uv pip install -r requirements.txt
+mise run install
 ```
 
 ## Usage
 
-### Using Mise Tasks (Recommended)
+### Web Application
 
-The project includes convenient mise tasks for common operations:
+Start the Flask server:
 
 ```bash
-# View all available tasks
-mise tasks
+# Production mode
+mise run web
 
-# Install dependencies
-mise run install
+# Development mode (with debug enabled)
+mise run dev
+```
 
-# Run tests
-mise run test
+The web interface supports:
+- Drag-and-drop file upload
+- JSON response for viewing extracted data
+- ICS file download for calendar import
+- Real-time validation and error messages
 
-# Convert a PDF to ICS
-mise run convert -- Billet.pdf DSB_Rejse_2025-11-14.ics
+### REST API
 
-# Run example conversion
+**Health Check:**
+```bash
+curl http://localhost:5000/api/health
+```
+
+**Convert PDF to ICS:**
+```bash
+curl -X POST -F "file=@Billet.pdf" \
+  http://localhost:5000/api/convert \
+  -o ticket.ics
+```
+
+**Get JSON Data:**
+```bash
+curl -X POST -F "file=@Billet.pdf" -F "format=json" \
+  http://localhost:5000/api/convert
+```
+
+### Command Line Interface
+
+```bash
+# Basic usage
+mise run convert -- Billet.pdf
+
+# Specify output filename
+mise run convert -- Billet.pdf my_journey.ics
+
+# Run example
 mise run example
-
-# Clean up generated files
-mise run clean
 ```
 
-### Direct Python Usage
+### Python API
 
-You can also run the script directly:
+```python
+from dsb_converter.api import extract_ticket_info, create_ics_file
 
-```bash
-mise exec -- python dsb_to_ics.py Billet.pdf DSB_Rejse_2025-11-14.ics
-```
+# Extract ticket information
+info = extract_ticket_info("Billet.pdf")
 
-If you don't specify an output filename, it will use the input filename with `.ics` extension:
+# Validate and create ICS file
+if info.is_valid():
+    create_ics_file(info, "output.ics")
 
-```bash
-mise exec -- python dsb_to_ics.py Billet.pdf
-# Creates: Billet.ics
-```
-
-### Example Output
-
-The script will display extracted information:
-
-```
-Processing: Billet.pdf
-
-Extracted Information:
-  From: Aarhus H
-  To: København H
-  Departure: 2025-11-14 13:15
-  Arrival: 16:06
-  Train: InterCityLyn 42
-  Wagon: 91
-  Seat: 22
-  Class: 1. klasse
-  Price: 30 kr.
-
-Creating ICS file...
-ICS file created: DSB_Rejse_2025-11-14.ics
-
-Done!
-```
-
-## Testing
-
-Run the automated test suite:
-
-```bash
-# Using mise task (recommended)
-mise run test
-
-# Or directly
-mise exec -- pytest test_dsb_to_ics.py -v
-```
-
-The test suite verifies:
-- PDF file reading and parsing
-- Correct extraction of all journey details
-- Valid ICS file generation
-- Proper timezone conversion
-- Complete end-to-end workflow
-
-## Extracted Information
-
-The tool extracts the following information from DSB tickets:
-
-- **Departure station** (e.g., "Aarhus H")
-- **Arrival station** (e.g., "København H")
-- **Departure date and time**
-- **Arrival time**
-- **Train type and number** (e.g., "InterCityLyn 42")
-- **Wagon number**
-- **Seat number**
-- **Travel class** (1st or 2nd class)
-- **Ticket price**
-
-## Generated ICS File Format
-
-The generated ICS file includes:
-
-- **Event summary**: "DSB Rejse – [From] → [To]"
-- **Location**: "[From] til [To]"
-- **Start/End times**: Correctly converted to UTC
-- **Description**: Train details, wagon, seat, class, and price
-- **Category**: Travel
-
-## Requirements
-
-- Python 3.11+
-- pdfplumber 0.11.0 (for PDF parsing)
-- icalendar 5.0.11 (for ICS generation)
-- python-dateutil 2.8.2 (for timezone handling)
-- pytest 8.0.0 (for testing)
-
-## Available Mise Tasks
-
-The project includes the following convenient tasks:
-
-| Task | Description |
-|------|-------------|
-| `mise run install` | Install Python dependencies |
-| `mise run test` | Run automated tests |
-| `mise run convert -- <input.pdf> [output.ics]` | Convert a DSB ticket PDF to ICS (note the `--`) |
-| `mise run example` | Run example conversion with Billet.pdf |
-| `mise run clean` | Clean up generated files and cache |
-
-View all tasks:
-```bash
-mise tasks
+# Access ticket data
+print(f"Route: {info.from_station} → {info.to_station}")
+print(f"Departure: {info.get_formatted_departure()}")
 ```
 
 ## Project Structure
 
 ```
 .
-├── .mise.toml              # Mise configuration with tasks
-├── .tool-versions          # Tool versions
-├── requirements.txt        # Python dependencies
-├── dsb_to_ics.py          # Main converter script
-├── test_dsb_to_ics.py     # Automated tests
-├── Billet.pdf             # Example DSB ticket
-└── README.md              # This file
+├── dsb_converter/              # Main package
+│   └── api/                    # Core API modules
+│       ├── models.py          # Data models (TicketInfo)
+│       ├── parsers.py         # PDF parsing logic
+│       ├── calendar.py        # ICS generation
+│       └── utils.py           # Utility functions
+├── templates/                  # Flask HTML templates
+│   └── index.html
+├── static/                     # Static assets
+├── app.py                     # Flask web application
+├── cli.py                     # Command-line interface
+├── test_api.py                # Flask API tests
+├── test_dsb_to_ics.py        # Core functionality tests
+├── requirements.txt           # Python dependencies
+├── Dockerfile                 # Docker configuration
+└── docker-compose.yml         # Docker Compose setup
 ```
 
-## Supported Ticket Types
+## API Reference
 
-Currently tested with:
+### TicketInfo Model
+
+```python
+from dsb_converter.api.models import TicketInfo
+
+# Attributes
+info.from_station: str
+info.to_station: str
+info.departure_date: tuple[int, int, int]  # (day, month, year)
+info.departure_time: tuple[int, int]       # (hour, minute)
+info.arrival_time: tuple[int, int]         # (hour, minute)
+info.train_type: str
+info.train_number: str
+info.wagon: str
+info.seat: str
+info.travel_class: str
+info.price: str
+
+# Methods
+info.is_valid() -> bool
+info.to_dict() -> dict
+info.get_formatted_departure() -> str
+info.get_formatted_arrival() -> str
+```
+
+### Functions
+
+**extract_ticket_info(pdf_path) -> TicketInfo**
+- Extract journey information from DSB ticket PDF
+- Raises: `FileNotFoundError`, `TicketParsingError`
+
+**create_ics_file(info, output_path) -> None**
+- Create ICS calendar file from ticket information
+- Raises: `CalendarGenerationError`
+
+**create_ics_bytes(info) -> bytes**
+- Create ICS calendar data as bytes
+- Raises: `CalendarGenerationError`
+
+## Testing
+
+Run the test suite:
+
+```bash
+mise run test
+```
+
+The test suite includes:
+- **API Tests** (`test_api.py`) - Flask endpoints, health checks, file uploads, error handling
+- **Core Tests** (`test_dsb_to_ics.py`) - PDF parsing, ICS generation, data extraction
+
+All tests verify outer interfaces, not implementation details.
+
+## Available Mise Tasks
+
+| Task | Description |
+|------|-------------|
+| `mise run install` | Install Python dependencies |
+| `mise run test` | Run automated tests |
+| `mise run web` | Start Flask web application |
+| `mise run dev` | Start Flask in debug mode |
+| `mise run convert -- <pdf> [ics]` | Convert PDF to ICS |
+| `mise run example` | Run example conversion |
+| `mise run clean` | Clean generated files |
+
+## Configuration
+
+### Environment Variables
+
+- `FLASK_DEBUG` - Enable debug mode (default: `false`)
+- `FLASK_HOST` - Server host (default: `0.0.0.0`)
+- `FLASK_PORT` - Server port (default: `5000`)
+
+Example:
+```bash
+export FLASK_PORT=8000
+python app.py
+```
+
+## Docker Deployment
+
+### Production
+
+```bash
+docker-compose up --build
+```
+
+### Custom Configuration
+
+```yaml
+services:
+  web:
+    environment:
+      - FLASK_DEBUG=false
+      - FLASK_PORT=5000
+    ports:
+      - "80:5000"
+```
+
+## Supported Features
+
+### Ticket Types
 - DSB Print Selv-billet (Print-at-home tickets)
 - InterCityLyn trains
 - InterCity trains
 - Regional trains
 
-## Supported Stations
-
-The tool recognizes Danish stations with common suffixes:
+### Station Types
 - **H** - Hovedbanegård (e.g., København H, Aarhus H)
-- **St.** - Station (e.g., Skanderborg St., Fredericia St.)
+- **St.** - Station (e.g., Skanderborg St.)
 - **M** - Other stations (e.g., Odense M)
 
-Tested with routes including:
-- Aarhus H ↔ København H
-- København H ↔ Skanderborg St.
+## Dependencies
 
-## Limitations
-
-- Requires valid DSB ticket PDFs with standard format
-- Year is inferred from booking date or current date if month has passed
-- Best results with standard DSB Print Selv-billet format
-
-## Contributing
-
-To add support for additional ticket formats or stations:
-
-1. Add test PDF samples
-2. Update the regex patterns in `extract_ticket_info()`
-3. Add corresponding test cases in `test_dsb_to_ics.py`
-4. Run the test suite to verify
+- Python 3.11+
+- pdfplumber 0.11.0
+- icalendar 5.0.11
+- python-dateutil 2.8.2
+- flask 3.0.0
+- werkzeug 3.0.1
+- requests 2.31.0
+- pytest 8.0.0
 
 ## License
 
